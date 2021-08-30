@@ -552,6 +552,12 @@ static int add_text_to_layout(ParlayLayout* layout, const char** text_handle,
         } else {
             gp->face_id = NULL;
             gp->glyph_index = 0;
+            // The rest shouldn't be needed, here as failsafe
+            gp->left = 0;
+            gp->width = 0;
+            gp->top = 0;
+            gp->height = 0;
+            gp->border_thickness = 0;
         }
         layout->n_glyphs++;
         layout->glyph_x += gp->advance;
@@ -671,7 +677,7 @@ static int finalize_layout(ParlayLayout* layout, int cropping_strategy, int fixe
         break;
 
     case PARLAY_CROP_Y_HEIGHT:
-        return 1504;
+        return 1404;
 
     case PARLAY_CROP_Y_FAILSAFE:
         get_y_glyph_bounds(layout,&bottom,&top);
@@ -725,11 +731,14 @@ static int realign(ParlayLayout* layout, int text_alignment) {
         while (i < layout->n_glyphs) {
             first_glyph = i;
             line_y = layout->glyph_plans[i].y;
+            last_glyph = i;
             i++;
             while (i < layout->n_glyphs && layout->glyph_plans[i].y == line_y) {
+                if (layout->glyph_plans[i].face_id != NULL) {
+                    last_glyph = i;
+                }
                 i++;
             }
-            last_glyph = i-1;
             shift = layout->width - layout->glyph_plans[last_glyph].x - layout->glyph_plans[last_glyph].width;
             if (text_alignment == PARLAY_ALIGN_CENTER) {
                 shift /= 2;
@@ -923,6 +932,21 @@ error:
 }
 
 
+
+static int final_offset(ParlayLayout* layout, ParlayRGBARawImage* image, int fixed_width, int text_alignment) {
+    if (fixed_width != 0) {
+        if (text_alignment == PARLAY_ALIGN_CENTER) {
+            image->x0 += (fixed_width - layout->width) / 2;
+        } else if (text_alignment == PARLAY_ALIGN_RIGHT) {
+            image->x0 += fixed_width - layout->width;
+        }
+    }
+    return 0;
+}
+
+
+
+
 //---------------------------------------------------------------------
 // Paragraph functions
 
@@ -1008,6 +1032,10 @@ int parlay_plain_text(const char* text, const ParlayStyle* style, const ParlayCo
         goto error;
     }
 
+    status = final_offset(layout,image,ctl->width,ctl->text_alignment);
+    if (status) {
+        goto error;
+    }
     status = 0;
 
 error:
@@ -1244,6 +1272,10 @@ int parlay_markup_text(const char* xml, const ParlayStyle* style, const ParlayCo
         goto error;
     }
 
+    status = final_offset(layout,image,ctl->width,text_alignment);
+    if (status) {
+        goto error;
+    }
     status = 0;
 
 error:
@@ -1261,7 +1293,7 @@ error:
 
 
 int parlay_free_image_data(ParlayRGBARawImage* image) {
-    if (image->data) {
+    if (image->data != NULL) {
         free(image->data);
         image->data = NULL;
     }

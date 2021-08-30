@@ -5,7 +5,7 @@ PARLAY
 Parlay is a C library for laying out out paragraphs to an in-memory
 buffer.
 
-This README is for version 0.1.
+This README is for version 0.2.
 
 
 Summary
@@ -76,6 +76,14 @@ http://blog.aerojockey.com/post/parlay
 
 Source distributions should include the license file and not rely on
 a link.
+
+
+Downloading
+-----------
+
+You can download Parlay from GitHub.
+
+https://github.com/aerojockey/parlay
 
 
 Building
@@ -208,6 +216,8 @@ int parlay_hello(char* font_filename) {
     /* We're done with image, free the image data. */
 
     parlay_free_image_data(&image);
+
+    return 0;
 }
 
 
@@ -220,8 +230,8 @@ examples of fun and cool things you can do with the image buffer output
 of Parlay.
 
 * You can use it to create OpenGL textures by passing it to
-  glTexImage2D. (I assume you can do something similar with Direct X but
-  I've never used it.)
+  glTexImage2D. (I assume you can do something similar with Direct X and
+  Vulkan but I've never used them.)
 
 * You can use an image format library, such as libpng or libjpeg, to save
   the buffer in a standard image format.
@@ -254,7 +264,7 @@ I wrote Parlay for a game I was working on, *The Ditty of Carmeana*.
 Early on in development, I realized my crude way of rendering individual
 letters from an alphabet texture didn't scale up well, and looked
 terrible.  (Even by *Ditty of Carmeana* standards, which, if you decide
-to look into the game, you will see are very very, low.)  I decided my
+to look into the game, you will see are very, very low.)  I decided my
 next step was to use real font rendering, and because I'm a modern,
 savvy programmer who mindlessly heeds the woke advice to reuse code and
 not reinvent the wheel, I went looking for a freeware library that could
