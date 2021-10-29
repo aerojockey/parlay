@@ -527,6 +527,7 @@ static int add_text_to_layout(ParlayLayout* layout, const char** text_handle,
             layout->any_highlights = 1;
             memcpy(gp->highlight_color,style->highlight_color,4*sizeof(float));
         }
+        gp->underline = style->underline;
         if (c_height != 0) {
             // if (prev_glyph_index != 0) {
             //    status = FT_Get_Kerning(face,glyph_index,prev_glyph_index,FT_KERNING_DEFAULT,&kerning);
@@ -759,7 +760,7 @@ static int realign(ParlayLayout* layout, int text_alignment) {
 }
 
 
-static void transfer_rect(ParlayLayout* layout, int x, int y, int width, int height, float rgb[3], float alpha, float* work) {
+static void transfer_rect(ParlayLayout* layout, int x, int y, int width, int height, const float rgb[3], float alpha, float* work) {
     int i, j, imax, jmax;
     size_t iw;
     float source_alpha, rem_alpha, total_alpha;
@@ -783,7 +784,26 @@ static void transfer_rect(ParlayLayout* layout, int x, int y, int width, int hei
 }
 
 
-static void transfer_buffer(ParlayLayout* layout, unsigned char* buffer, int x, int y, int width, int height, float rgb[3], float alpha, float* work) {
+static void smear_rect(ParlayLayout* layout, int x, int y, int width, int height, const float rgb[3], float alpha, int bt, float* work) {
+    int i, j;
+    float r;
+    if (bt == 0) {
+        return;
+    }
+    for (i = -bt; i <= bt; i++) {
+        for (j = -bt; j <= bt; j++) {
+            r = sqrt(i*i+j*j);
+            if (r <= bt) {
+                transfer_rect(layout,x+i,y+j,width,height,rgb,alpha,work);
+            } else if (r <= bt+1) {
+                transfer_rect(layout,x+i,y+j,width,height,rgb,alpha*(bt+1-r),work);
+            }
+        }
+    }
+}
+
+
+static void transfer_buffer(ParlayLayout* layout, unsigned char* buffer, int x, int y, int width, int height, const float rgb[3], float alpha, float* work) {
     int i, j, imax, jmax;
     size_t ig, iw;
     float source_alpha, rem_alpha, total_alpha;
@@ -810,7 +830,7 @@ static void transfer_buffer(ParlayLayout* layout, unsigned char* buffer, int x, 
 }
 
 
-static void smear_buffer(ParlayLayout* layout, unsigned char* buffer, int x, int y, int width, int height, float rgb[3], float alpha, int bt, float* work) {
+static void smear_buffer(ParlayLayout* layout, unsigned char* buffer, int x, int y, int width, int height, const float rgb[3], float alpha, int bt, float* work) {
     int i, j;
     float r;
     if (bt == 0) {
@@ -829,6 +849,18 @@ static void smear_buffer(ParlayLayout* layout, unsigned char* buffer, int x, int
 }
 
 
+static void transfer_underline(ParlayLayout* layout, const ParlayGlyphPlan* gp, int underline_x, int underline_y, int underline_descender, float* work, int smear) {
+    int y = -underline_y + underline_descender/2;
+    int width = gp->x + gp->advance - underline_x;
+    int height = MIN((underline_descender+4)/5,1);
+    if (smear) {
+        smear_rect(layout,underline_x,y,width,height,gp->border_color,gp->border_color[3],gp->border_thickness,work);
+    } else {
+        transfer_rect(layout,underline_x,y,width,height,gp->text_color,gp->text_color[3],work);
+    }
+}
+
+
 static int rasterize(ParlayLayout* layout, const float background_color[4], ParlayRGBARawImage* image) {
     unsigned char* data = NULL;
     float* work = NULL;
@@ -839,6 +871,7 @@ static int rasterize(ParlayLayout* layout, const float background_color[4], Parl
     FTC_SBit sbit;
     FT_BitmapGlyph glyph;
     unsigned char* c_buffer;
+    int underlining, underline_x = 0, underline_y = 0, underline_descender = 0;
     int status = 9999;
 
     face_size_info.pixel = 1;
@@ -874,6 +907,7 @@ static int rasterize(ParlayLayout* layout, const float background_color[4], Parl
     }
 
     for (m = layout->any_borders ? 0 : 1; m < 2; m++) {
+        underlining = 0;
         for (k = 0; k < layout->n_glyphs; k++) {
             gp = &layout->glyph_plans[k];
             if (gp->face_id == NULL) {
@@ -904,6 +938,26 @@ static int rasterize(ParlayLayout* layout, const float background_color[4], Parl
             } else {
                 transfer_buffer(layout,c_buffer,x,y,gp->width,gp->height,gp->text_color,gp->text_color[3],work);
             }
+            if (underlining) {
+                if (!gp->underline || gp->y != underline_y || gp->line_height-gp->ascender != underline_descender) {
+                    transfer_underline(layout,gp,underline_x,underline_y,underline_descender,work,m==0);
+                    if (gp->underline) {
+                        underline_x = gp->x;
+                        underline_y = gp->y;
+                        underline_descender = gp->line_height-gp->ascender;
+                    } else {
+                        underlining = 0;
+                    }
+                }
+            } else if (gp->underline) {
+                underlining = 1;
+                underline_x = gp->x;
+                underline_y = gp->y;
+                underline_descender = gp->line_height-gp->ascender;
+            }
+        }
+        if (underlining) {
+            transfer_underline(layout,gp,underline_x,underline_y,underline_descender,work,m==0);
         }
     }
 
@@ -1078,6 +1132,9 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
     } else if (!strcmp(tag,"i")) {
         style.font_style |= PARLAY_STYLE_ITALIC;
         parse_style_attributes = 0;
+    } else if (!strcmp(tag,"u")) {
+        parse_style_attributes = 0;
+        style.underline = 1;
     } else {
         status = 302;
         goto error;
@@ -1177,6 +1234,15 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
             style.text_color[3] = x;
             style.border_color[3] = x;
         }
+        w = mxmlElementGetAttr(node,"underline");
+        if (w != NULL) {
+            c = atoi(w);
+            if (c != 0 && c != 1) {
+                status = 311;
+                goto error;
+            }
+            style.underline = c;
+        }
     }
 
     subnode = mxmlGetFirstChild(node);
@@ -1206,7 +1272,7 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
             break;
 
         default:
-            status = 311;
+            status = 312;
             goto error;
         }
 

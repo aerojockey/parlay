@@ -5,7 +5,7 @@ PARLAY
 Parlay is a C library for laying out out paragraphs to an in-memory
 buffer.
 
-This README is for version 0.2.
+This README is for version 0.3.
 
 
 Summary
@@ -55,7 +55,8 @@ Limitations
   actually tried it
 * Requires user to register font files (it doesn't use system fonts at all)
 * Supports ONLY the UTF-8 encoding
-* Does not yet support some basic styles like underline
+* Does not yet support some basic styles like strikeout, double underline,
+  superscript or subscript
 * Does not yet support grayscale buffers, though of course you can render
   gray characters to an RGB buffer
 * Does not currently support kerning
@@ -89,8 +90,8 @@ https://github.com/aerojockey/parlay
 Building
 --------
 
-Parlay is highly portable C.  I think the only compatibility drama might
-come from a pair of inline functions.  I don't expect you'll have
+Parlay is written in portable C.  I think the only compatibility drama
+might come from a pair of inline functions.  I don't expect you'll have
 trouble building it on any system that FreeType supports.
 
 Unless you're building libparlay.so for some kind of Linux distro, I
@@ -183,6 +184,7 @@ int parlay_hello(char* font_filename) {
     style.text_color[3] = 1.0;  /* alpha component of text color, 1 = fully opaque */
     style.border_thickness = 0; /* no border around the glyphs */
     style.highlight = 0;        /* no highlighting */
+    style.underline = 0;        /* no underlining */
 
     /* Set up the control structure */
 
@@ -304,15 +306,14 @@ when I care to share my infrequent changes with the widespread community
 of Parlay users, I manually copy the changes into my local cloned Git
 repo using the Linux cp command, commit it and push it to master, with a
 helpful log message like, "Pushed upstream changes from The Ditty of
-Carmeana". At least that's how I plan to do it since haven't actually
-pushed any changes yet.
+Carmeana".
 
 For now, if you want to contribute, the workflow is, "send me a patch
 and/or verbal description of changes by email, and if I approve I'll
 make the changes to my own repository use the above method to deploy".
 
 Should this library grow and more people want to collaborate on it, we
-will switch to the woke Git workflow, with detached states and all that
+will switch to the woke Git workflow, with detached heads and all that
 useful stuff.  But for now I have no desire to implement a full-blown
 workflow for this tiny project with three source files.
 

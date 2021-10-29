@@ -58,6 +58,7 @@ typedef struct {
     float border_color[4];
     int highlight;
     float highlight_color[4];
+    int underline;
     float font_scaler;
     
     /* etc */
