@@ -866,7 +866,7 @@ static int rasterize(ParlayLayout* layout, const float background_color[4], Parl
     float* work = NULL;
     int x, y;
     size_t k, m;
-    ParlayGlyphPlan* gp;
+    ParlayGlyphPlan* gp = NULL;
     FTC_ScalerRec face_size_info;
     FTC_SBit sbit;
     FT_BitmapGlyph glyph;
@@ -1067,6 +1067,65 @@ int parlay_plain_text(const char* text, const ParlayStyle* style, const ParlayCo
     }
 
     status = add_text_to_layout(layout,&text,style,ctl->width,ctl->collapse_whitespace,SIZE_MAX);
+    if (status) {
+        goto error;
+    }
+
+    status = finalize_layout(layout,ctl->cropping_strategy,ctl->width);
+    if (status) {
+        goto error;
+    }
+
+    status = realign(layout,ctl->text_alignment);
+    if (status) {
+        goto error;
+    }
+
+    status = rasterize(layout,ctl->background_color,image);
+    if (status) {
+        goto error;
+    }
+
+    status = final_offset(layout,image,ctl->width,ctl->text_alignment);
+    if (status) {
+        goto error;
+    }
+    status = 0;
+
+error:
+    if (layout != NULL) {
+        delete_layout(layout);
+    }
+
+    return status;
+}
+
+
+int parlay_plain_text_with_cursor(const char* text, size_t cursor_position, const ParlayStyle* style, const ParlayStyle* cursor_style,
+        const ParlayControl* ctl, ParlayRGBARawImage* image) {
+    ParlayLayout* layout = NULL;
+    int status = 9999;
+
+    status = new_layout(strlen(text),&layout);
+    if (status) {
+        goto error;
+    }
+
+    status = add_text_to_layout(layout,&text,style,ctl->width,0,cursor_position);
+    if (status) {
+        goto error;
+    }
+
+    if (*text == 0) {
+        text = " ";
+    }
+
+    status = add_text_to_layout(layout,&text,cursor_style,ctl->width,0,1);
+    if (status) {
+        goto error;
+    }
+
+    status = add_text_to_layout(layout,&text,style,ctl->width,0,SIZE_MAX);
     if (status) {
         goto error;
     }
