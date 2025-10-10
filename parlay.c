@@ -177,7 +177,7 @@ int parlay_register_font(const char* font_name, const char* normal_filename, con
     }
     font_rec = malloc(alloc_size);
     if (font_rec == NULL) {
-        status = 301;
+        status = 101;
         goto error;
     }
     p = (char*)&font_rec[1];
@@ -528,6 +528,7 @@ static int add_text_to_layout(ParlayLayout* layout, const char** text_handle,
             memcpy(gp->highlight_color,style->highlight_color,4*sizeof(float));
         }
         gp->underline = style->underline;
+        gp->strikethrough = style->strikethrough;
         if (c_height != 0) {
             // if (prev_glyph_index != 0) {
             //    status = FT_Get_Kerning(face,glyph_index,prev_glyph_index,FT_KERNING_DEFAULT,&kerning);
@@ -544,12 +545,6 @@ static int add_text_to_layout(ParlayLayout* layout, const char** text_handle,
             gp->width = c_width;
             gp->top = c_top;
             gp->height = c_height;
-            memcpy(gp->text_color,style->text_color,4*sizeof(float));
-            gp->border_thickness = style->border_thickness;
-            if (style->border_thickness) {
-                memcpy(gp->border_color,style->border_color,4*sizeof(float));
-                layout->any_borders = 1;
-            }
         } else {
             gp->face_id = NULL;
             gp->glyph_index = 0;
@@ -558,6 +553,16 @@ static int add_text_to_layout(ParlayLayout* layout, const char** text_handle,
             gp->width = 0;
             gp->top = 0;
             gp->height = 0;
+        }
+        if (c_height != 0 || gp->underline || gp->strikethrough) {
+            memcpy(gp->text_color,style->text_color,4*sizeof(float));
+            gp->border_thickness = style->border_thickness;
+            if (gp->border_thickness) {
+                memcpy(gp->border_color,style->border_color,4*sizeof(float));
+                layout->any_borders = 1;
+            }
+        } else {
+            // Shouldn't be needed, here as failsafe
             gp->border_thickness = 0;
         }
         layout->n_glyphs++;
@@ -849,18 +854,6 @@ static void smear_buffer(ParlayLayout* layout, unsigned char* buffer, int x, int
 }
 
 
-static void transfer_underline(ParlayLayout* layout, const ParlayGlyphPlan* gp, int underline_x, int underline_y, int underline_descender, float* work, int smear) {
-    int y = -underline_y + underline_descender/2;
-    int width = gp->x + gp->advance - underline_x;
-    int height = MIN((underline_descender+4)/5,1);
-    if (smear) {
-        smear_rect(layout,underline_x,y,width,height,gp->border_color,gp->border_color[3],gp->border_thickness,work);
-    } else {
-        transfer_rect(layout,underline_x,y,width,height,gp->text_color,gp->text_color[3],work);
-    }
-}
-
-
 static int rasterize(ParlayLayout* layout, const float background_color[4], ParlayRGBARawImage* image) {
     unsigned char* data = NULL;
     float* work = NULL;
@@ -871,7 +864,6 @@ static int rasterize(ParlayLayout* layout, const float background_color[4], Parl
     FTC_SBit sbit;
     FT_BitmapGlyph glyph;
     unsigned char* c_buffer;
-    int underlining, underline_x = 0, underline_y = 0, underline_descender = 0;
     int status = 9999;
 
     face_size_info.pixel = 1;
@@ -907,57 +899,58 @@ static int rasterize(ParlayLayout* layout, const float background_color[4], Parl
     }
 
     for (m = layout->any_borders ? 0 : 1; m < 2; m++) {
-        underlining = 0;
         for (k = 0; k < layout->n_glyphs; k++) {
             gp = &layout->glyph_plans[k];
-            if (gp->face_id == NULL) {
-                continue;
-            }
-            face_size_info.face_id = gp->face_id;
-            face_size_info.width = gp->font_px;
-            face_size_info.height = gp->font_px;
-            if (gp->is_sbit) {
-                status = FTC_SBitCache_LookupScaler(sbit_cache,&face_size_info,FT_LOAD_RENDER,gp->glyph_index,&sbit,NULL);
-                if (status) {
-                    status = 1903;
-                    goto error;
-                }
-                c_buffer = sbit->buffer;
-            } else {
-                status = FTC_ImageCache_LookupScaler(image_cache,&face_size_info,FT_LOAD_RENDER,gp->glyph_index,(FT_Glyph*)&glyph,NULL);
-                if (status) {
-                    status = 1903;
-                    goto error;
-                }
-                c_buffer = glyph->bitmap.buffer;
-            }
-            y = layout->y_image_offset - (gp->y + gp->top);
-            x = (gp->x + gp->left) - layout->x_image_offset;
-            if (m == 0) {
-                smear_buffer(layout,c_buffer,x,y,gp->width,gp->height,gp->border_color,gp->border_color[3],gp->border_thickness,work);
-            } else {
-                transfer_buffer(layout,c_buffer,x,y,gp->width,gp->height,gp->text_color,gp->text_color[3],work);
-            }
-            if (underlining) {
-                if (!gp->underline || gp->y != underline_y || gp->line_height-gp->ascender != underline_descender) {
-                    transfer_underline(layout,gp,underline_x,underline_y,underline_descender,work,m==0);
-                    if (gp->underline) {
-                        underline_x = gp->x;
-                        underline_y = gp->y;
-                        underline_descender = gp->line_height-gp->ascender;
-                    } else {
-                        underlining = 0;
+            if (gp->face_id != NULL) {
+                face_size_info.face_id = gp->face_id;
+                face_size_info.width = gp->font_px;
+                face_size_info.height = gp->font_px;
+                if (gp->is_sbit) {
+                    status = FTC_SBitCache_LookupScaler(sbit_cache,&face_size_info,FT_LOAD_RENDER,gp->glyph_index,&sbit,NULL);
+                    if (status) {
+                        status = 1903;
+                        goto error;
                     }
+                    c_buffer = sbit->buffer;
+                } else {
+                    status = FTC_ImageCache_LookupScaler(image_cache,&face_size_info,FT_LOAD_RENDER,gp->glyph_index,(FT_Glyph*)&glyph,NULL);
+                    if (status) {
+                        status = 1903;
+                        goto error;
+                    }
+                    c_buffer = glyph->bitmap.buffer;
                 }
-            } else if (gp->underline) {
-                underlining = 1;
-                underline_x = gp->x;
-                underline_y = gp->y;
-                underline_descender = gp->line_height-gp->ascender;
+                y = layout->y_image_offset - (gp->y + gp->top);
+                x = (gp->x + gp->left) - layout->x_image_offset;
+                if (m == 0) {
+                    smear_buffer(layout,c_buffer,x,y,gp->width,gp->height,gp->border_color,gp->border_color[3],gp->border_thickness,work);
+                } else {
+                    transfer_buffer(layout,c_buffer,x,y,gp->width,gp->height,gp->text_color,gp->text_color[3],work);
+                }
             }
-        }
-        if (underlining) {
-            transfer_underline(layout,gp,underline_x,underline_y,underline_descender,work,m==0);
+            if (gp->underline) {
+                int descender = gp->line_height-gp->ascender;
+                int ux = gp->x;
+                int uy = -gp->y + descender/2;
+                int uwidth = gp->advance;
+                int uheight = MAX((descender+4)/5,1);
+                if (m == 0) {
+                    smear_rect(layout,ux,uy,uwidth,uheight,gp->border_color,gp->border_color[3],gp->border_thickness,work);
+                } else {
+                    transfer_rect(layout,ux,uy,uwidth,uheight,gp->text_color,gp->text_color[3],work);
+                }
+            }
+            if (gp->strikethrough) {
+                int ux = gp->x;
+                int uy = -gp->y - gp->ascender/3;
+                int uwidth = gp->advance;
+                int uheight = MAX(gp->ascender/10,1);
+                if (m == 0) {
+                    smear_rect(layout,ux,uy,uwidth,uheight,gp->border_color,gp->border_color[3],gp->border_thickness,work);
+                } else {
+                    transfer_rect(layout,ux,uy,uwidth,uheight,gp->text_color,gp->text_color[3],work);
+                }
+            }
         }
     }
 
@@ -1194,6 +1187,9 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
     } else if (!strcmp(tag,"u")) {
         parse_style_attributes = 0;
         style.underline = 1;
+    } else if (!strcmp(tag,"s")) {
+        parse_style_attributes = 0;
+        style.strikethrough = 1;
     } else {
         status = 302;
         goto error;
@@ -1301,6 +1297,15 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
                 goto error;
             }
             style.underline = c;
+        }
+        w = mxmlElementGetAttr(node,"strikethrough");
+        if (w != NULL) {
+            c = atoi(w);
+            if (c != 0 && c != 1) {
+                status = 312;
+                goto error;
+            }
+            style.strikethrough = c;
         }
     }
 

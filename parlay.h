@@ -59,6 +59,7 @@ typedef struct {
     int highlight;
     float highlight_color[4];
     int underline;
+    int strikethrough;
     float font_scaler;
     
     /* etc */
@@ -109,6 +110,9 @@ int parlay_register_font(const char* font_name, const char* normal_filename, con
         const char* bold_filename, const char* bold_italic_filename);
 
 int parlay_plain_text(const char* text, const ParlayStyle* style, const ParlayControl* ctl, ParlayRGBARawImage* image);
+
+int parlay_plain_text_with_cursor(const char* text, size_t cursor_position, const ParlayStyle* style,
+        const ParlayStyle* cursor_style, const ParlayControl* ctl, ParlayRGBARawImage* image);
 
 #if PARLAY_USE_MINIXML
 int parlay_markup_text(const char* xml, const ParlayStyle* style, const ParlayControl* ctl, ParlayRGBARawImage* image);

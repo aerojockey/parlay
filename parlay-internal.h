@@ -52,6 +52,7 @@ typedef struct {
     int highlight;
     float highlight_color[4];
     int underline;
+    int strikethrough;
 } ParlayGlyphPlan;
 
 
