@@ -55,8 +55,8 @@ Limitations
   actually tried it
 * Requires user to register font files (it doesn't use system fonts at all)
 * Supports ONLY the UTF-8 encoding
-* Does not yet support some basic styles like strikeout, double underline,
-  superscript or subscript
+* Does not yet support some basic styles like double underline, superscript
+  or subscript
 * Does not yet support grayscale buffers, though of course you can render
   gray characters to an RGB buffer
 * Does not currently support kerning
