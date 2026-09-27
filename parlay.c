@@ -261,6 +261,10 @@ static FTC_CMapCache cmap_cache;
 static FTC_SBitCache sbit_cache;
 static FTC_ImageCache image_cache;
 
+#if PARLAY_USE_MINIXML
+static mxml_options_t* mxml_options;
+#endif
+
 
 static int new_layout(size_t n_glyphs_cap, ParlayLayout** rlayout) {
     ParlayLayout* layout = NULL;
@@ -797,7 +801,7 @@ static void smear_rect(ParlayLayout* layout, int x, int y, int width, int height
     }
     for (i = -bt; i <= bt; i++) {
         for (j = -bt; j <= bt; j++) {
-            r = sqrt(i*i+j*j);
+            r = (float)sqrt(i*i+j*j);
             if (r <= bt) {
                 transfer_rect(layout,x+i,y+j,width,height,rgb,alpha,work);
             } else if (r <= bt+1) {
@@ -843,7 +847,7 @@ static void smear_buffer(ParlayLayout* layout, unsigned char* buffer, int x, int
     }
     for (i = -bt; i <= bt; i++) {
         for (j = -bt; j <= bt; j++) {
-            r = sqrt(i*i+j*j);
+            r = (float)sqrt(i*i+j*j);
             if (r <= bt) {
                 transfer_buffer(layout,buffer,x+i,y+j,width,height,rgb,alpha,work);
             } else if (r <= bt+1) {
@@ -1029,6 +1033,13 @@ int parlay_init(void) {
             return 5;
         }
     }
+#if PARLAY_USE_MINIXML
+    mxml_options = mxmlOptionsNew();
+    if (mxml_options == NULL) {
+        return 6;
+    }
+    mxmlOptionsSetTypeValue(mxml_options,MXML_TYPE_OPAQUE);
+#endif
     return 0;
 }
 
@@ -1217,7 +1228,7 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
         }
         w = mxmlElementGetAttr(node,"size");
         if (w != NULL) {
-            x = atof(w);
+            x = (float)atof(w);
             if (x <= 0) {
                 status = 304;
                 goto error;
@@ -1236,9 +1247,10 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
                     status = 306;
                     goto error;
                 }
-                style.text_color[i] = c / 255.0;
+                style.text_color[i] = (float)(c / 255.0);
             }
-        }
+            style.text_color[3] = 1;
+      }
         w = mxmlElementGetAttr(node,"border");
         if (w != NULL) {
             i = atoi(w);
@@ -1260,9 +1272,10 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
                     status = 309;
                     goto error;
                 }
-                style.border_color[i] = c / 255.0;
+                style.border_color[i] = (float)(c / 255.0);
             }
-        }
+            style.border_color[3] = 1;
+       }
         w = mxmlElementGetAttr(node,"highlight_color");
         if (w != NULL) {
             if (strlen(w) != 7 || w[0] != '#') {
@@ -1275,13 +1288,13 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
                     status = 309;
                     goto error;
                 }
-                style.highlight_color[i] = c / 255.0;
+                style.highlight_color[i] = (float)(c / 255.0);
             }
             style.highlight = 1;
         }
         w = mxmlElementGetAttr(node,"visibility");
         if (w != NULL) {
-            x = atof(w);
+            x = (float)atof(w);
             if (x < 0 || x > 1) {
                 status = 310;
                 goto error;
@@ -1314,7 +1327,7 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
         subtype = mxmlGetType(subnode);
         switch (subtype) {
 
-        case MXML_ELEMENT:
+        case MXML_TYPE_ELEMENT:
             tag = mxmlGetElement(subnode);
             if (!strcmp(tag,"br")) {
                 w = "\n";
@@ -1327,7 +1340,7 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
             }
             break;
 
-        case MXML_OPAQUE:
+        case MXML_TYPE_OPAQUE:
             w = mxmlGetOpaque(subnode);
             status = add_text_to_layout(layout,&w,&style,wrap_width,collapse_whitespace,SIZE_MAX);
             if (status) {
@@ -1336,7 +1349,7 @@ static int lay_out_element(ParlayLayout* layout, mxml_node_t* node,
             break;
 
         default:
-            status = 312;
+            status = 313;
             goto error;
         }
 
@@ -1357,9 +1370,9 @@ int parlay_markup_text(const char* xml, const ParlayStyle* style, const ParlayCo
     int text_alignment;
     int status = 9999;
 
-    top_node = mxmlLoadString(NULL,xml,MXML_OPAQUE_CALLBACK);
+    top_node = mxmlLoadString(NULL,mxml_options,xml);
     if (top_node == NULL) {
-        status = 201;
+        status = 202;
         goto error;
     }
 
@@ -1388,7 +1401,7 @@ int parlay_markup_text(const char* xml, const ParlayStyle* style, const ParlayCo
     } else if (!strcmp(w,"right")) {
         text_alignment = PARLAY_ALIGN_RIGHT;
     } else {
-        status = 202;
+        status = 203;
         goto error;
     }
 
