@@ -299,13 +299,14 @@ Note on Workflow
 I'm using GitHub mainly for distribution and visibility.  I'm not using
 the Git workflow at all.
 
-Currently, the official repository of Parlay is my private Subversion
-repository for *The Ditty of Carmeana* (that's right, Subversion,
-because that's how I roll, fight me), and I make my updates there. Then,
-when I care to share my infrequent changes with the widespread community
-of Parlay users, I manually copy the changes into my local cloned Git
-repo using the Linux cp command, commit it and push it to master, with a
-helpful log message like, "Pushed upstream changes from The Ditty of
+Currently, the official repository of Parlay is the private Git
+repository for Tampered Evidence LLC, and I make my updates there. (I
+held onto Subversion for as long as I could but eventually gave up and
+decided to stop rowing upstream, and got a GitHub repo.) Then, when I
+care to share my infrequent changes with the widespread community of
+Parlay users, I manually copy the changes into my local cloned Git
+repo using the Linux cp command, commit it and push it to master, with
+a helpful log message like, "Pushed upstream changes from The Ditty of
 Carmeana".
 
 For now, if you want to contribute, the workflow is, "send me a patch
